@@ -40,6 +40,7 @@ enum DatetimeFunctions: String, CaseIterable {
   }
 
   case parseUnixTime
+  case parseUnixTimeAsLocal
   case nowLocal
   case addMillis
   case setYear
@@ -57,11 +58,14 @@ enum DatetimeFunctions: String, CaseIterable {
   case getMinutes
   case getSeconds
   case getMillis
+  case timestamp
 
   var function: Function {
     switch self {
     case .parseUnixTime:
       return FunctionUnary(impl: _parseUnixTime)
+    case .parseUnixTimeAsLocal:
+      return FunctionUnary(impl: _parseUnixTimeAsLocal)
     case .nowLocal:
       return FunctionNullary(impl: _nowLocal)
     case .addMillis:
@@ -96,12 +100,27 @@ enum DatetimeFunctions: String, CaseIterable {
       return FunctionUnary(impl: _getSeconds)
     case .getMillis:
       return FunctionUnary(impl: _getMillis)
+    case .timestamp:
+      return FunctionUnary(impl: _timestamp)
     }
   }
 }
 
 private func _parseUnixTime(_ value: Int) -> Date {
   Date(timeIntervalSince1970: Double(value))
+}
+
+private func _parseUnixTimeAsLocal(_ value: Int) -> Date {
+  let dateUTC = Date(timeIntervalSince1970: Double(value))
+  let timeZoneOffset = Double(TimeZone.current.secondsFromGMT(for: dateUTC))
+  guard let localDate = Calendar.current.date(
+    byAdding: .second,
+    value: Int(timeZoneOffset),
+    to: dateUTC
+  ) else {
+    return dateUTC
+  }
+  return localDate
 }
 
 private func _nowLocal() -> Date {
@@ -256,6 +275,10 @@ private func _getSeconds(_ value: Date) throws -> Int {
 
 private func _getMillis(_ value: Date) -> Int {
   Int(value.timeIntervalSince1970.truncatingRemainder(dividingBy: 1) * 1000)
+}
+
+private func _timestamp(_ value: Date) -> Int {
+  Int(value.timeIntervalSince1970)
 }
 
 private func makeFuncName(_ funcName: String, _ date: Date, _ value: Int) -> String {
